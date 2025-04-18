@@ -2,7 +2,7 @@ module regulated_coin::regulated_coin;
     use sui::coin;
     use sui::balance::Balance;
     use sui::balance;
-
+    
     #[test_only]
     use sui::test_scenario::{Self};
     #[test_only]
@@ -89,31 +89,32 @@ public fun value<T>(coin: &Coin<T>): u64 {
     }
 
 #[test]
-    fun test_init_and_mint() {
-        // Set up the test scenario
-        let admin = @0xAD;
-        let mut scenario = test_scenario::begin(admin);
+fun test_init_and_mint() {
+    // Set up the test scenario
+    let admin = @0xAD;
+    let mut scenario = test_scenario::begin(admin);
+    
+    // Test package initialization
+    {
+        test_init(test_scenario::ctx(&mut scenario));
+    };
+    
+    // Advance to the next transaction (admin's turn)
+    test_scenario::next_tx(&mut scenario, admin);
+    {
+        // First, try to take the TreasuryCap from the admin's address
+        let mut treasury_cap = test_scenario::take_from_sender<TreasuryCap<REGULATED_COIN>>(&scenario);
         
-        // Test package initialization
-        {
-            test_init(test_scenario::ctx(&mut scenario));
-        };
+        // Test minting to the admin
+        let minted_coin = mint(&mut treasury_cap, 1000, test_scenario::ctx(&mut scenario));
+        assert_eq(value(&minted_coin), 1000); // <-- Fixed: Removed the error code argument
         
-        // Test that the admin received the treasury cap
-        test_scenario::next_tx(&mut scenario, admin);
-        {
-            let mut treasury_cap = test_scenario::take_from_sender<TreasuryCap<REGULATED_COIN>>(&scenario);
-            
-            // Test minting to the admin
-            let minted_coin = mint(&mut treasury_cap, 1000, test_scenario::ctx(&mut scenario));
-            assert_eq(value(&minted_coin), 1000);
-            
-            // Transfer the minted coin to self for this test
-            transfer::public_transfer(minted_coin, admin);
-            
-            // Return the treasury cap to the object store
-            test_scenario::return_to_sender(&scenario, treasury_cap);
-        };
+        // Transfer the minted coin to self for this test
+        transfer::public_transfer(minted_coin, admin);
         
-        test_scenario::end(scenario);
-    }
+        // Return the treasury cap to the object store
+        test_scenario::return_to_sender(&scenario, treasury_cap);
+    };
+    
+    test_scenario::end(scenario);
+}
